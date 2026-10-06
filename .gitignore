@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# installed on first run by setup.sh
+node_modules/
+package-lock.json
