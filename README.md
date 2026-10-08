@@ -6,7 +6,7 @@
 
 A screenshot, key art or concept image goes in, and a ready game prototype comes out. AI paints the art; code moves it.
 
-**English** · [Русский](README.ru.md)
+**English** · [العربية](README.ar.md) · [Русский](README.ru.md)
 
 ![Claude Code skill](https://img.shields.io/badge/Claude_Code-skill-D97757)
 ![Codex skill](https://img.shields.io/badge/Codex-skill-10A37F)
