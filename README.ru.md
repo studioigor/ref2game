@@ -6,7 +6,7 @@
 
 На входе скриншот, ключевой арт или концепт, на выходе готовый прототип игры. Картинки рисует ИИ, двигает их код.
 
-[English](README.md) · **Русский**
+[English](README.md) · [العربية](README.ar.md) · **Русский**
 
 ![Claude Code skill](https://img.shields.io/badge/Claude_Code-skill-D97757)
 ![Codex skill](https://img.shields.io/badge/Codex-skill-10A37F)
