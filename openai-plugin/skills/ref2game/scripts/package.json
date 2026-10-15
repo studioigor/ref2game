@@ -1,0 +1,7 @@
+{
+  "name": "ref2game-tools",
+  "private": true,
+  "type": "module",
+  "description": "Headless Chromium for render.mjs / livecheck.mjs",
+  "dependencies": { "playwright": "^1.47.0" }
+}

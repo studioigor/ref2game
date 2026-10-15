@@ -1,0 +1,99 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>live</title>
+<style>
+:root{--ar:1.7778}
+html,body{margin:0;background:#000;height:100%;overflow:hidden}
+canvas{display:block;width:min(100vw,calc(100vh*var(--ar)));height:auto;aspect-ratio:var(--ar);margin:auto;position:absolute;inset:0}
+#hint{pointer-events:none;position:absolute;left:0;right:0;bottom:3vh;text-align:center;font:600 18px -apple-system,sans-serif;color:#fff;text-shadow:0 2px 6px #000;transition:opacity .4s}
+#dev{position:absolute;left:10px;bottom:8px;font:12px ui-monospace,Menlo,monospace;color:#fff;background:#0008;padding:5px 8px;border-radius:6px;opacity:.55;white-space:pre}
+#dev:hover{opacity:1}
+#flash{position:absolute;right:12px;bottom:10px;font:600 13px -apple-system,sans-serif;color:#9f9;background:#000a;padding:4px 10px;border-radius:6px;opacity:0;transition:opacity .6s}
+</style>
+</head><body><canvas id="c"></canvas>
+<div id="hint">press any key or click to play — arrows / WASD move, Space jump, X action, R restart</div>
+<div id="dev"></div><div id="flash">reloaded</div>
+<script>
+// LIVE PREVIEW. Scripts and images load with a cache-buster; the page polls its sources and reloads itself when any of
+// them changes, keeping the play state (sessionStorage). Attract demo until a key or click, then play (keyboard + pointer).
+// Dev keys: P pause, [ ] speed (0.1 / 0.25 / 0.5 / 1), . single step, Esc back to the demo, R restart.
+// ?render=1 exposes window.__renderAt(t) for render.mjs (no loop, no polling).
+const V = Date.now(), STATIC = !!window.__STATIC__;          // STATIC: packed build (no polling, no dev overlay)
+const load = (src) => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src + '?v=' + V; s.onload = res; s.onerror = () => rej(new Error('failed ' + src)); document.head.appendChild(s); });
+(async () => {
+  // sizes.js: window.SIZES (display size per sprite in view px, engine.md §7); audio.js: sound from the event bus (stub until used)
+  for (const f of ['assets.js', 'sizes.js', 'gl.js', 'lib.js', 'sim.js', 'scene.js', 'audio.js']) await load(f);
+  const q = new URLSearchParams(location.search), render = q.has('render');
+  const VW = (SIM.VIEW || {}).W || 1920, VH = (SIM.VIEW || {}).H || 1080;             // view size and aspect come from the sim
+  document.documentElement.style.setProperty('--ar', VW / VH); if (SIM.HINT) document.getElementById('hint').textContent = SIM.HINT;
+  G.init(document.getElementById('c'), VW, VH);
+  const rep = new Set(SCENE.REPEAT || []), near = (n) => SCENE.NEAREST === true || (SCENE.NEAREST || []).includes(n);   // NEAREST: true = all
+  await Promise.all(Object.keys(ASSETS).map((n) => G.load(n, 'assets/' + n + '.png?v=' + V, { repeat: rep.has(n), nearest: near(n) })));
+  SCENE.programs();
+  window.__duration = SIM.L;
+  window.__renderAt = (t) => { SCENE.render(t); return document.getElementById('c').toDataURL('image/png'); };
+  window.__ready = true;
+  if (render) return;
+
+  const keys = {}, hint = document.getElementById('hint'), dev = document.getElementById('dev'), flash = document.getElementById('flash');
+  const SPEEDS = [0.1, 0.25, 0.5, 1];
+  let play = null, acc = 0, simT = 0, speed = 1, paused = false, stepOnce = false, fps = 60;
+  try { const sv = JSON.parse(sessionStorage.getItem('live') || 'null');                     // restore across live reloads
+    if (sv) { simT = sv.simT; speed = sv.speed; paused = sv.paused; if (sv.play) { play = Object.assign(SIM.create(), sv.play); hint.style.opacity = 0; }
+      flash.style.opacity = 1; setTimeout(() => (flash.style.opacity = 0), 1200); } } catch (e) {}
+  const save = () => { try { sessionStorage.setItem('live', JSON.stringify({ simT, speed, paused, play })); } catch (e) {} };
+  addEventListener('keydown', (e) => {
+    const c = e.code;
+    if (c === 'KeyP') { paused = !paused; e.preventDefault(); return; }
+    if (c === 'Period') { stepOnce = true; paused = true; e.preventDefault(); return; }
+    if (c === 'BracketLeft') { speed = SPEEDS[Math.max(0, SPEEDS.indexOf(speed) - 1)]; return; }
+    if (c === 'BracketRight') { speed = SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(speed) + 1)]; return; }
+    if (c === 'Escape') { play = null; SCENE.state = null; hint.style.opacity = 1; return; }
+    keys[c] = 1;
+    const dg = /^Digit(\d)$/.exec(c); if (dg) pend.slot = +dg[1] || 10;                     // 1–9, 0 → inp.slot (hotbars)
+    if (!play || c === 'KeyR') { play = SIM.spawn(simT); hint.style.opacity = 0; }
+    e.preventDefault();
+  });
+  addEventListener('keyup', (e) => { keys[e.code] = 0; });
+  // pointer in view pixels (VW×VH); click is true for exactly one sim step
+  const cv = document.getElementById('c'), ptr = { x: VW / 2, y: VH / 2, down: 0, click: 0 }, pend = { slot: 0, wheel: 0 };
+  addEventListener('wheel', (e) => { if (play) { pend.wheel = Math.sign(e.deltaY); e.preventDefault(); } }, { passive: false });
+  addEventListener('contextmenu', (e) => e.preventDefault());
+  const toView = (e) => { const r = cv.getBoundingClientRect(); ptr.x = (e.clientX - r.left) / r.width * VW; ptr.y = (e.clientY - r.top) / r.height * VH; };
+  addEventListener('pointermove', toView);
+  addEventListener('pointerdown', (e) => { toView(e); ptr.down = 1; ptr.click = 1; if (!play) { play = SIM.spawn(simT); hint.style.opacity = 0; } });
+  addEventListener('pointerup', () => { ptr.down = 0; });
+  let last = performance.now(), fpsAcc = 0, fpsN = 0;
+  const loop = () => {
+    const now = performance.now(), wall = Math.min(0.1, (now - last) / 1000); last = now;
+    fpsAcc += wall; fpsN++; if (fpsAcc > 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+    const dt = paused ? (stepOnce ? 1 / 60 : 0) : wall * speed; stepOnce = false;
+    simT += dt;
+    if (play) {
+      acc += dt;
+      const inp = { left: keys.ArrowLeft || keys.KeyA, right: keys.ArrowRight || keys.KeyD, up: keys.ArrowUp || keys.KeyW, down: keys.ArrowDown || keys.KeyS,
+        jump: keys.Space, act: keys.KeyX || keys.KeyJ || keys.Enter, px: ptr.x, py: ptr.y, press: ptr.down, click: ptr.click, slot: pend.slot, wheel: pend.wheel };
+      while (acc >= SIM.DT) { SIM.step(play, inp); inp.click = ptr.click = 0; inp.slot = pend.slot = 0; inp.wheel = pend.wheel = 0; acc -= SIM.DT; }
+      if (SIM.outOfPlay && SIM.outOfPlay(play)) play = SIM.respawn ? SIM.respawn(play, simT) : SIM.spawn(simT);
+      SCENE.state = play;
+    } else SCENE.state = null;
+    try { SCENE.render(simT); } catch (e) { if (!window.__renderErr) { window.__renderErr = e; console.error(e); } }   // log once, keep the loop alive
+    if (!STATIC) dev.style.display = (paused || speed !== 1 || q.has('dev')) ? 'block' : 'none';   // debug line only when paused / slowed or with ?dev
+    if (!STATIC) dev.textContent = `LIVE  ${play ? 'play' : 'demo'}  ${paused ? 'PAUSED' : speed + '×'}  ${fps.toFixed(0)} fps   P pause  [ ] speed  . step  Esc demo  R restart`;
+    requestAnimationFrame(loop);
+  };
+  loop();
+  if (STATIC) { dev.style.display = 'none'; return; }
+  const WATCH = ['index.html', 'scene.js', 'sim.js', 'lib.js', 'gl.js', 'assets.js', 'sizes.js', 'audio.js'], stamp = {};
+  const poll = async () => {
+    for (const f of WATCH) {
+      try { const r = await fetch(f + '?poll=' + Date.now(), { method: 'HEAD', cache: 'no-store' }); const m = r.headers.get('last-modified') + r.headers.get('content-length');
+        if (stamp[f] && stamp[f] !== m) { save(); location.reload(); return; } stamp[f] = m; } catch (e) {}
+    }
+    setTimeout(poll, 700);
+  };
+  poll();
+})().catch((e) => { console.error(e); document.body.insertAdjacentHTML('beforeend', '<pre style="color:#f88;position:absolute;top:0;left:0;background:#000c;padding:12px;font:13px monospace;white-space:pre-wrap">' + e.stack + '</pre>');
+  const f = ['scene.js', 'sim.js', 'lib.js', 'gl.js', 'assets.js', 'index.html'], st = {};               // keep polling: fixing the error reloads by itself
+  setInterval(async () => { for (const x of f) { try { const r = await fetch(x + '?p=' + Date.now(), { method: 'HEAD', cache: 'no-store' }); const m = r.headers.get('last-modified');
+    if (st[x] && st[x] !== m) location.reload(); st[x] = m; } catch (e) {} } }, 800); });
+</script></body></html>

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "ref2game",
+  "version": "0.1.0",
+  "description": "Turn a visual reference into a polished, playable 2D game slice with generated art, deterministic simulation, measured fidelity, animation, effects and QA.",
+  "author": {
+    "name": "studioigor",
+    "url": "https://github.com/studioigor"
+  },
+  "homepage": "https://github.com/studioigor/ref2game",
+  "repository": "https://github.com/studioigor/ref2game",
+  "keywords": [
+    "game-development",
+    "skills",
+    "studioigor"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "ref2game",
+        "shortDescription": "Reference to playable 2D",
+        "longDescription": "Build a polished playable 2D game slice from a screenshot, video, concept, key art or mood reference. The workflow studies the reference, creates a style bible and measured match state, generates art, builds deterministic simulation and scene code, adds rigs/effects/game feel, and validates the result with automated QA and critics.",
+        "developerName": "studioigor",
+        "category": "Developer Tools",
+        "capabilities": [
+          "2D game prototyping",
+          "Reference matching",
+          "Game art workflow",
+          "Game feel and QA"
+        ],
+        "defaultPrompt": [
+          "Turn this reference into a playable 2D game slice.",
+          "Build a 2D level from this gameplay video.",
+          "Match this concept art as a playable scene."
+        ]
+      }
+    }
+  },
+  "license": "MIT"
+}
